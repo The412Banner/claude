@@ -153,8 +153,8 @@ public class ClaudeSessionService extends Service {
     }
 
     private String stripAnsi(String s) {
-        return s.replaceAll("\\[[;\\d]*[A-Za-z]", "")
-                .replaceAll("\\][^]*", "")
+        return s.replaceAll("\\[[;\\d]*[A-Za-z]", "")
+                .replaceAll("\\][^]*", "")
                 .replace("\r", "");
     }
 
