@@ -46,6 +46,10 @@ public class MainActivity extends AppCompatActivity {
         String savedKey = prefs.getString("api_key", "");
         if (!savedKey.isEmpty()) {
             apiKeyInput.setHint("API key saved");
+            if (getIntent().getBooleanExtra("launch_terminal", false)) {
+                doLaunchBridge();
+                return;
+            }
         }
 
         installBridgeBtn.setOnClickListener(v -> {
