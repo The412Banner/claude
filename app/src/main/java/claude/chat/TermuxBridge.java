@@ -37,7 +37,7 @@ public class TermuxBridge {
         String cmd = "echo '" + b64 + "' | base64 -d > " + BRIDGE_SCRIPT_PATH
                 + " && chmod +x " + BRIDGE_SCRIPT_PATH
                 + "; pkill -f claude_bridge.py; sleep 0.5"
-                + "; python3 " + BRIDGE_SCRIPT_PATH + " " + apiKey + " &";
+                + "; nohup python3 " + BRIDGE_SCRIPT_PATH + " " + apiKey + " </dev/null >/dev/null 2>&1 &";
         return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/bash", "-c", cmd}, false);
     }
 
