@@ -45,7 +45,7 @@ public class TermuxBridge {
             intent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", extraArgs);
         }
         intent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
-        intent.putExtra("com.termux.RUN_COMMAND_TERMINAL", openTermux);
+        intent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", !openTermux);
         try {
             ctx.startForegroundService(intent);
             return null;
