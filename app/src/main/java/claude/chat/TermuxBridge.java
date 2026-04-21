@@ -38,11 +38,11 @@ public class TermuxBridge {
         return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/bash", "-c", writeCmd}, false);
     }
 
-    // Returns null on success, or an error string on failure
+    // Kills any existing bridge, installs latest script, then starts fresh
     public static String startBridge(Context ctx, String apiKey) {
-        return runInTermux(ctx, new String[]{
-            "/data/data/com.termux/files/usr/bin/python3", BRIDGE_SCRIPT_PATH, apiKey
-        }, false);
+        installBridgeScript(ctx, apiKey);
+        String cmd = "pkill -f claude_bridge.py; sleep 0.5; python3 " + BRIDGE_SCRIPT_PATH + " " + apiKey + " &";
+        return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/bash", "-c", cmd}, false);
     }
 
     // Returns null on success, or an error message string if it fails
