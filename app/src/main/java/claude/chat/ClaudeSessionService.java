@@ -62,14 +62,29 @@ public class ClaudeSessionService extends Service {
         this.listener = null;
     }
 
+    private boolean connecting = false;
+
     public void connect(String apiKey) {
-        if (connected) return;
+        if (connected || connecting) return;
+        connecting = true;
         executor.execute(() -> connectWithRetry(apiKey));
+    }
+
+    private boolean isBridgeAlreadyRunning() {
+        try {
+            Socket test = new Socket("127.0.0.1", TermuxBridge.BRIDGE_PORT);
+            test.close();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void connectWithRetry(String apiKey) {
         emit("Starting bridge...\n");
-        TermuxBridge.startBridge(this, apiKey);
+        if (!isBridgeAlreadyRunning()) {
+            TermuxBridge.startBridge(this, apiKey);
+        }
         int attempts = 0;
         while (attempts < 20 && !connected) {
             try {
@@ -88,6 +103,7 @@ public class ClaudeSessionService extends Service {
         if (!connected) {
             emit("\nCould not connect. Make sure claude is installed in Termux.\n");
         }
+        connecting = false;
     }
 
     private void readLoop() {
