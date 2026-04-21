@@ -51,6 +51,15 @@ public class TerminalActivity extends AppCompatActivity {
         executor.execute(this::connectWithRetry);
 
         sendBtn.setOnClickListener(v -> sendInput());
+
+        findViewById(R.id.key_esc).setOnClickListener(v -> sendRaw(""));
+        findViewById(R.id.key_tab).setOnClickListener(v -> sendRaw("\t"));
+        findViewById(R.id.key_up).setOnClickListener(v -> sendRaw("[A"));
+        findViewById(R.id.key_down).setOnClickListener(v -> sendRaw("[B"));
+        findViewById(R.id.key_left).setOnClickListener(v -> sendRaw("[D"));
+        findViewById(R.id.key_right).setOnClickListener(v -> sendRaw("[C"));
+        findViewById(R.id.key_enter).setOnClickListener(v -> sendRaw("\n"));
+
         inputView.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEND ||
                 (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN)) {
@@ -103,6 +112,18 @@ public class TerminalActivity extends AppCompatActivity {
         return s.replaceAll("\\[[;\\d]*[A-Za-z]", "")
                 .replaceAll("\\][^]*", "")
                 .replace("\r", "");
+    }
+
+    private void sendRaw(String seq) {
+        if (!connected) return;
+        executor.execute(() -> {
+            try {
+                if (outputStream != null) {
+                    outputStream.write(seq.getBytes(StandardCharsets.UTF_8));
+                    outputStream.flush();
+                }
+            } catch (Exception ignored) {}
+        });
     }
 
     private void sendInput() {

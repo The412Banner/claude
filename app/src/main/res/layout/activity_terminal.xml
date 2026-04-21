@@ -25,6 +25,43 @@
 
     </ScrollView>
 
+    <!-- Extra keys row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#111111"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
+
+        <Button android:id="@+id/key_esc"
+            style="@style/ExtraKey"
+            android:text="ESC" />
+        <Button android:id="@+id/key_tab"
+            style="@style/ExtraKey"
+            android:text="TAB" />
+        <Button android:id="@+id/key_up"
+            style="@style/ExtraKey"
+            android:text="▲" />
+        <Button android:id="@+id/key_down"
+            style="@style/ExtraKey"
+            android:text="▼" />
+        <Button android:id="@+id/key_left"
+            style="@style/ExtraKey"
+            android:text="◀" />
+        <Button android:id="@+id/key_right"
+            style="@style/ExtraKey"
+            android:text="▶" />
+        <Button android:id="@+id/key_enter"
+            style="@style/ExtraKey"
+            android:layout_weight="2"
+            android:text="ENTER" />
+
+    </LinearLayout>
+
+    <!-- Input row -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
