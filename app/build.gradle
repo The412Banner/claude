@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.the412banner.claude'
+    namespace 'claude.chat'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.the412banner.claude"
+        applicationId "claude.chat"
         minSdk 26
         targetSdk 34
         versionCode 1

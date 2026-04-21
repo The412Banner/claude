@@ -1,4 +1,4 @@
-package com.the412banner.claude;
+package claude.chat;
 
 import android.content.ComponentName;
 import android.content.Context;
