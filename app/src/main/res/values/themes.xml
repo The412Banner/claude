@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Claude" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#D4A843</item>
+        <item name="colorPrimaryVariant">#B8922E</item>
+        <item name="colorOnPrimary">#000000</item>
+        <item name="android:windowBackground">#121212</item>
+    </style>
+</resources>
