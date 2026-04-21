@@ -43,7 +43,15 @@ def bridge(conn, master_fd):
     t1.join()
     t2.join()
 
+LOG = "/data/data/com.termux/files/home/bridge.log"
+
+def log(msg):
+    import datetime
+    with open(LOG, "a") as f:
+        f.write(f"{datetime.datetime.now()} {msg}\n")
+
 def main():
+    log(f"bridge started pid={os.getpid()} argv={sys.argv}")
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key and len(sys.argv) > 1:
         api_key = sys.argv[1]
@@ -54,12 +62,18 @@ def main():
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind((HOST, PORT))
+    try:
+        server.bind((HOST, PORT))
+    except OSError as e:
+        log(f"bind failed: {e}")
+        sys.exit(0)
     server.listen(1)
+    log(f"listening on {HOST}:{PORT}")
     print(f"Claude bridge listening on {HOST}:{PORT}")
 
     while True:
         conn, addr = server.accept()
+        log(f"client connected from {addr}")
         print(f"Client connected: {addr}")
 
         master_fd, slave_fd = pty.openpty()
