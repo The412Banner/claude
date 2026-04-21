@@ -145,7 +145,8 @@ def handle_session(conn, api_key):
         pass
 
 def main():
-    log(f"bridge started pid={os.getpid()} argv={sys.argv}")
+    safe_argv = [a if "sk-ant" not in a else "sk-ant-***" for a in sys.argv]
+    log(f"bridge started pid={os.getpid()} argv={safe_argv}")
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key and len(sys.argv) > 1:
         api_key = sys.argv[1]
