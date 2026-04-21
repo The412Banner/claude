@@ -11,10 +11,10 @@ import android.widget.ImageButton;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -27,7 +27,7 @@ public class TerminalActivity extends AppCompatActivity {
     private ExecutorService executor;
 
     private Socket socket;
-    private PrintWriter writer;
+    private OutputStream outputStream;
     private boolean connected = false;
 
     @Override
@@ -46,7 +46,6 @@ public class TerminalActivity extends AppCompatActivity {
         SharedPreferences prefs = getSharedPreferences("claude_prefs", MODE_PRIVATE);
         String apiKey = prefs.getString("api_key", "");
 
-        // Launch bridge in Termux, then connect
         TermuxBridge.startBridge(this, apiKey);
         appendOutput("Starting bridge...\n");
         executor.execute(this::connectWithRetry);
@@ -68,7 +67,7 @@ public class TerminalActivity extends AppCompatActivity {
             try {
                 Thread.sleep(1000);
                 socket = new Socket("127.0.0.1", TermuxBridge.BRIDGE_PORT);
-                writer = new PrintWriter(socket.getOutputStream(), true);
+                outputStream = socket.getOutputStream();
                 connected = true;
                 appendOutput("Connected.\n");
                 readLoop();
@@ -84,16 +83,26 @@ public class TerminalActivity extends AppCompatActivity {
 
     private void readLoop() {
         try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                final String output = line + "\n";
-                appendOutput(output);
+            InputStream in = socket.getInputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                String raw = new String(buf, 0, n, StandardCharsets.UTF_8);
+                String clean = stripAnsi(raw);
+                if (!clean.isEmpty()) appendOutput(clean);
             }
         } catch (Exception e) {
-            appendOutput("\n[disconnected]\n");
-            connected = false;
+            // ignore
         }
+        appendOutput("\n[disconnected]\n");
+        connected = false;
+    }
+
+    private String stripAnsi(String s) {
+        // Remove ANSI escape sequences and carriage returns
+        return s.replaceAll("\\[[;\\d]*[A-Za-z]", "")
+                .replaceAll("\\][^]*", "")
+                .replace("\r", "");
     }
 
     private void sendInput() {
@@ -102,7 +111,12 @@ public class TerminalActivity extends AppCompatActivity {
         inputView.setText("");
         appendOutput("> " + text + "\n");
         executor.execute(() -> {
-            if (writer != null) writer.println(text);
+            try {
+                if (outputStream != null) {
+                    outputStream.write((text + "\n").getBytes(StandardCharsets.UTF_8));
+                    outputStream.flush();
+                }
+            } catch (Exception ignored) {}
         });
     }
 
