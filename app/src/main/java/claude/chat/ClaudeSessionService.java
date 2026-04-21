@@ -180,9 +180,15 @@ public class ClaudeSessionService extends Service {
         s = s.replaceAll("\\x1B.", "").replaceAll("\\x1B", "");
         // Normalize CR
         s = s.replace("\r\n", "\n").replace("\r", "");
-        // Drop lines that are only spinner/decoration chars
-        s = s.replaceAll("(?m)^[\u2808-\u280F\u2810-\u281F\u2820-\u282F\u2830-\u283F✓✗·\\s]*$\n?", "");
-        // Collapse 3+ consecutive blank lines to one blank line
+        // Drop lines that are only box-drawing/separator chars
+        s = s.replaceAll("(?m)^[\\u2500-\\u257F\\-_=\\s]+$\n?", "");
+        // Drop Claude CLI status bar lines
+        s = s.replaceAll("(?m)^.*(?:bypass permissions|shift\\+tab to cycle|esctointerrupt|esc to interrupt|·/effort|·medium).*$\n?", "");
+        // Drop lines starting with thinking/spinner chars (braille, ✦ ✺ · ❯ › *)
+        s = s.replaceAll("(?m)^[\\u2800-\\u28FF✦✺✸✼✤✢✣·❯›⊕⊗*✓✗\\s]{0,3}[\\u2800-\\u28FF✦✺✸✼✤✢✣·❯›⊕⊗*].*$\n?", "");
+        // Drop lone prompt chars
+        s = s.replaceAll("(?m)^[›❯>\\s]+$\n?", "");
+        // Collapse 3+ consecutive blank lines
         s = s.replaceAll("\n{3,}", "\n\n");
         return s;
     }
