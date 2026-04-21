@@ -10,11 +10,44 @@ import socket
 import subprocess
 import threading
 import sys
+import datetime
 
 PORT = 9876
 HOST = "127.0.0.1"
+LOG = "/data/data/com.termux/files/home/bridge.log"
 
-def bridge(conn, master_fd):
+current_proc = None
+current_proc_lock = threading.Lock()
+
+def log(msg):
+    with open(LOG, "a") as f:
+        f.write(f"{datetime.datetime.now()} {msg}\n")
+
+def handle_session(conn, api_key):
+    global current_proc
+    env = os.environ.copy()
+    if api_key:
+        env["ANTHROPIC_API_KEY"] = api_key
+
+    master_fd, slave_fd = pty.openpty()
+    proc = subprocess.Popen(
+        [
+            "/data/data/com.termux/files/usr/bin/proot-distro", "login", "debian",
+            "--user", "claude-user", "--", "claude", "--dangerously-skip-permissions"
+        ],
+        stdin=slave_fd,
+        stdout=slave_fd,
+        stderr=slave_fd,
+        env=env,
+        close_fds=True
+    )
+    os.close(slave_fd)
+
+    with current_proc_lock:
+        current_proc = proc
+
+    log(f"claude spawned pid={proc.pid}")
+
     def forward_to_client():
         while True:
             try:
@@ -40,25 +73,21 @@ def bridge(conn, master_fd):
     t2 = threading.Thread(target=forward_to_process, daemon=True)
     t1.start()
     t2.start()
-    t1.join()
-    t2.join()
-
-LOG = "/data/data/com.termux/files/home/bridge.log"
-
-def log(msg):
-    import datetime
-    with open(LOG, "a") as f:
-        f.write(f"{datetime.datetime.now()} {msg}\n")
+    proc.wait()
+    log(f"claude exited pid={proc.pid}")
+    with current_proc_lock:
+        if current_proc is proc:
+            current_proc = None
+    try:
+        os.close(master_fd)
+    except OSError:
+        pass
 
 def main():
     log(f"bridge started pid={os.getpid()} argv={sys.argv}")
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key and len(sys.argv) > 1:
         api_key = sys.argv[1]
-
-    env = os.environ.copy()
-    if api_key:
-        env["ANTHROPIC_API_KEY"] = api_key
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -69,31 +98,20 @@ def main():
         sys.exit(0)
     server.listen(1)
     log(f"listening on {HOST}:{PORT}")
-    print(f"Claude bridge listening on {HOST}:{PORT}")
 
     while True:
         conn, addr = server.accept()
         log(f"client connected from {addr}")
-        print(f"Client connected: {addr}")
 
-        master_fd, slave_fd = pty.openpty()
-        proc = subprocess.Popen(
-            [
-                "/data/data/com.termux/files/usr/bin/proot-distro", "login", "debian",
-                "--user", "claude-user", "--", "claude", "--dangerously-skip-permissions"
-            ],
-            stdin=slave_fd,
-            stdout=slave_fd,
-            stderr=slave_fd,
-            env=env,
-            close_fds=True
-        )
-        os.close(slave_fd)
+        # Kill any existing claude session before starting a new one
+        with current_proc_lock:
+            if current_proc is not None:
+                log(f"killing previous claude pid={current_proc.pid}")
+                current_proc.terminate()
 
-        t = threading.Thread(target=bridge, args=(conn, master_fd), daemon=True)
+        t = threading.Thread(target=handle_session, args=(conn, api_key), daemon=True)
         t.start()
-        proc.wait()
-        print("Claude process exited")
+        # Immediately loop back to accept() — don't block here
 
 if __name__ == "__main__":
     main()
