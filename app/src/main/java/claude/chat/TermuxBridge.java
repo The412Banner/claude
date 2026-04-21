@@ -1,9 +1,10 @@
 package claude.chat;
 
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 public class TermuxBridge {
 
@@ -23,14 +24,25 @@ public class TermuxBridge {
 
     // Returns null on success, or an error string on failure
     public static String installBridgeScript(Context ctx, String apiKey) {
-        String script = getBridgeScriptContent(apiKey);
+        String script;
+        try {
+            InputStream is = ctx.getAssets().open("claude_bridge.py");
+            byte[] buffer = new byte[is.available()];
+            is.read(buffer);
+            is.close();
+            script = new String(buffer, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return "Failed to read bridge script: " + e.getMessage();
+        }
         String writeCmd = "cat > " + BRIDGE_SCRIPT_PATH + " << 'BRIDGESCRIPT'\n" + script + "\nBRIDGESCRIPT\nchmod +x " + BRIDGE_SCRIPT_PATH;
         return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/bash", "-c", writeCmd}, false);
     }
 
     // Returns null on success, or an error string on failure
     public static String startBridge(Context ctx, String apiKey) {
-        return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/python3", BRIDGE_SCRIPT_PATH}, false);
+        return runInTermux(ctx, new String[]{
+            "/data/data/com.termux/files/usr/bin/python3", BRIDGE_SCRIPT_PATH, apiKey
+        }, false);
     }
 
     // Returns null on success, or an error message string if it fails
@@ -54,12 +66,5 @@ public class TermuxBridge {
         } catch (Exception e) {
             return e.getMessage();
         }
-    }
-
-    private static String getBridgeScriptContent(String apiKey) {
-        // Returned as a string so it can be written to Termux home at runtime.
-        // The actual content lives in assets/claude_bridge.py — this path is used
-        // only when the asset loader is unavailable (fallback).
-        return "# placeholder — install via assets";
     }
 }
