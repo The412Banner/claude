@@ -73,7 +73,7 @@ public class TerminalActivity extends AppCompatActivity {
         findViewById(R.id.key_down).setOnClickListener(v -> sendRaw("[B"));
         findViewById(R.id.key_left).setOnClickListener(v -> sendRaw("[D"));
         findViewById(R.id.key_right).setOnClickListener(v -> sendRaw("[C"));
-        findViewById(R.id.key_enter).setOnClickListener(v -> sendRaw("\n"));
+        findViewById(R.id.key_enter).setOnClickListener(v -> sendRaw("\r"));
 
         connectToggleBtn.setOnClickListener(v -> {
             if (!bound || service == null) return;
@@ -133,6 +133,6 @@ public class TerminalActivity extends AppCompatActivity {
         String text = inputView.getText().toString();
         inputView.setText("");
         outputView.append("> " + text + "\n");
-        sendRaw(text + "\n");
+        sendRaw(text + "\r");
     }
 }
