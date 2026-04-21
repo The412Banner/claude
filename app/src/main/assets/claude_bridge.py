@@ -64,7 +64,10 @@ def main():
 
         master_fd, slave_fd = pty.openpty()
         proc = subprocess.Popen(
-            ["/data/data/com.termux/files/usr/bin/claude"],
+            [
+                "/data/data/com.termux/files/usr/bin/proot-distro", "login", "debian",
+                "--user", "claude-user", "--", "claude", "--dangerously-skip-permissions"
+            ],
             stdin=slave_fd,
             stdout=slave_fd,
             stderr=slave_fd,
