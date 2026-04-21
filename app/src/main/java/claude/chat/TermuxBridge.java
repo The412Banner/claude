@@ -3,15 +3,15 @@ package claude.chat;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.util.Base64;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 
 public class TermuxBridge {
 
     static final int BRIDGE_PORT = 9876;
     private static final String TERMUX_PACKAGE = "com.termux";
     private static final String TERMUX_RUN_COMMAND = "com.termux.RUN_COMMAND";
-    private static final String BRIDGE_SCRIPT_PATH = "/data/data/com.termux/files/home/claude_bridge.py";
+    static final String BRIDGE_SCRIPT_PATH = "/data/data/com.termux/files/home/claude_bridge.py";
 
     public static boolean isTermuxInstalled(Context ctx) {
         try {
@@ -22,30 +22,37 @@ public class TermuxBridge {
         }
     }
 
-    // Returns null on success, or an error string on failure
+    // Install script only (used from setup UI)
     public static String installBridgeScript(Context ctx, String apiKey) {
-        String script;
+        String b64 = readScriptAsBase64(ctx);
+        if (b64 == null) return "Failed to read bridge script from assets";
+        String cmd = "echo '" + b64 + "' | base64 -d > " + BRIDGE_SCRIPT_PATH + " && chmod +x " + BRIDGE_SCRIPT_PATH;
+        return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/bash", "-c", cmd}, false);
+    }
+
+    // Single command: write script via base64, kill old bridge, start fresh — all in one intent
+    public static String startBridge(Context ctx, String apiKey) {
+        String b64 = readScriptAsBase64(ctx);
+        if (b64 == null) return "Failed to read bridge script from assets";
+        String cmd = "echo '" + b64 + "' | base64 -d > " + BRIDGE_SCRIPT_PATH
+                + " && chmod +x " + BRIDGE_SCRIPT_PATH
+                + "; pkill -f claude_bridge.py; sleep 0.5"
+                + "; python3 " + BRIDGE_SCRIPT_PATH + " " + apiKey + " &";
+        return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/bash", "-c", cmd}, false);
+    }
+
+    private static String readScriptAsBase64(Context ctx) {
         try {
             InputStream is = ctx.getAssets().open("claude_bridge.py");
             byte[] buffer = new byte[is.available()];
             is.read(buffer);
             is.close();
-            script = new String(buffer, StandardCharsets.UTF_8);
+            return Base64.encodeToString(buffer, Base64.NO_WRAP);
         } catch (Exception e) {
-            return "Failed to read bridge script: " + e.getMessage();
+            return null;
         }
-        String writeCmd = "cat > " + BRIDGE_SCRIPT_PATH + " << 'BRIDGESCRIPT'\n" + script + "\nBRIDGESCRIPT\nchmod +x " + BRIDGE_SCRIPT_PATH;
-        return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/bash", "-c", writeCmd}, false);
     }
 
-    // Kills any existing bridge, installs latest script, then starts fresh
-    public static String startBridge(Context ctx, String apiKey) {
-        installBridgeScript(ctx, apiKey);
-        String cmd = "pkill -f claude_bridge.py; sleep 0.5; python3 " + BRIDGE_SCRIPT_PATH + " " + apiKey + " &";
-        return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/bash", "-c", cmd}, false);
-    }
-
-    // Returns null on success, or an error message string if it fails
     public static String runInTermux(Context ctx, String[] args, boolean openTermux) {
         Intent intent = new Intent();
         intent.setClassName(TERMUX_PACKAGE, TERMUX_PACKAGE + ".app.RunCommandService");
