@@ -30,7 +30,7 @@ public class TermuxBridge {
 
     // Returns null on success, or an error string on failure
     public static String startBridge(Context ctx, String apiKey) {
-        return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/python3", BRIDGE_SCRIPT_PATH}, true);
+        return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/python3", BRIDGE_SCRIPT_PATH}, false);
     }
 
     // Returns null on success, or an error message string if it fails
