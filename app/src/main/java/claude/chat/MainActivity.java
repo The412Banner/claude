@@ -13,6 +13,11 @@ public class MainActivity extends AppCompatActivity {
 
     private SharedPreferences prefs;
 
+    private void showPermissionError(TextView statusView) {
+        statusView.setText("⚠ Termux permission denied.\n\nIn Termux, run:\nSettings → Allow External Apps\n\nor run this command in Termux:\nsettings put global termux_allow_external_apps true\n\nThen tap the button again.");
+        statusView.setTextColor(0xFFFF9800);
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -47,8 +52,16 @@ public class MainActivity extends AppCompatActivity {
             if (!key.isEmpty()) {
                 prefs.edit().putString("api_key", key).apply();
             }
-            TermuxBridge.installBridgeScript(this, prefs.getString("api_key", ""));
-            termuxStatus.setText("Bridge script installing...");
+            String err = TermuxBridge.installBridgeScript(this, prefs.getString("api_key", ""));
+            if (err == null) {
+                termuxStatus.setText("Bridge script installing... check Termux");
+                termuxStatus.setTextColor(0xFF4CAF50);
+            } else if (err.equals("permission_denied")) {
+                showPermissionError(termuxStatus);
+            } else {
+                termuxStatus.setText("Error: " + err);
+                termuxStatus.setTextColor(0xFFFF5252);
+            }
         });
 
         launchBtn.setOnClickListener(v -> {
@@ -60,8 +73,16 @@ public class MainActivity extends AppCompatActivity {
                 apiKeyInput.setError("Enter your Anthropic API key first");
                 return;
             }
-            Intent intent = new Intent(this, TerminalActivity.class);
-            startActivity(intent);
+            String err = TermuxBridge.startBridge(this, prefs.getString("api_key", ""));
+            if (err == null) {
+                Intent intent = new Intent(this, TerminalActivity.class);
+                startActivity(intent);
+            } else if (err.equals("permission_denied")) {
+                showPermissionError(termuxStatus);
+            } else {
+                termuxStatus.setText("Error: " + err);
+                termuxStatus.setTextColor(0xFFFF5252);
+            }
         });
     }
 }

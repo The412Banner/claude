@@ -21,20 +21,20 @@ public class TermuxBridge {
         }
     }
 
-    // Install the bridge script into Termux home via RUN_COMMAND
-    public static void installBridgeScript(Context ctx, String apiKey) {
+    // Returns null on success, or an error string on failure
+    public static String installBridgeScript(Context ctx, String apiKey) {
         String script = getBridgeScriptContent(apiKey);
-        // Write script via echo — split into chunks to avoid arg length limits
         String writeCmd = "cat > " + BRIDGE_SCRIPT_PATH + " << 'BRIDGESCRIPT'\n" + script + "\nBRIDGESCRIPT\nchmod +x " + BRIDGE_SCRIPT_PATH;
-        runInTermux(ctx, new String[]{"bash", "-c", writeCmd}, true);
+        return runInTermux(ctx, new String[]{"bash", "-c", writeCmd}, true);
     }
 
-    // Start the bridge script in Termux (opens a visible Termux session)
-    public static void startBridge(Context ctx, String apiKey) {
-        runInTermux(ctx, new String[]{"python3", BRIDGE_SCRIPT_PATH}, true);
+    // Returns null on success, or an error string on failure
+    public static String startBridge(Context ctx, String apiKey) {
+        return runInTermux(ctx, new String[]{"python3", BRIDGE_SCRIPT_PATH}, true);
     }
 
-    private static void runInTermux(Context ctx, String[] args, boolean openTermux) {
+    // Returns null on success, or an error message string if it fails
+    public static String runInTermux(Context ctx, String[] args, boolean openTermux) {
         Intent intent = new Intent();
         intent.setClassName(TERMUX_PACKAGE, TERMUX_PACKAGE + ".app.RunCommandService");
         intent.setAction(TERMUX_RUN_COMMAND);
@@ -46,7 +46,14 @@ public class TermuxBridge {
         }
         intent.putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home");
         intent.putExtra("com.termux.RUN_COMMAND_TERMINAL", openTermux);
-        ctx.startForegroundService(intent);
+        try {
+            ctx.startForegroundService(intent);
+            return null;
+        } catch (SecurityException e) {
+            return "permission_denied";
+        } catch (Exception e) {
+            return e.getMessage();
+        }
     }
 
     private static String getBridgeScriptContent(String apiKey) {
