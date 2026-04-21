@@ -8,10 +8,14 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
+import java.io.FileWriter;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -29,6 +33,7 @@ public class ClaudeSessionService extends Service {
 
     private OutputListener listener;
     private final StringBuilder outputBuffer = new StringBuilder();
+    private String chatLogPath = null;
 
     public interface OutputListener {
         void onOutput(String text);
@@ -89,6 +94,9 @@ public class ClaudeSessionService extends Service {
     }
 
     private void connectWithRetry(String apiKey) {
+        String ts = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(new Date());
+        chatLogPath = "/data/data/com.termux/files/home/chat_" + ts + ".txt";
+        appendLog("[session started " + ts + "]\n");
         emit("Starting bridge...\n");
         TermuxBridge.startBridge(this, apiKey);
         int attempts = 0;
@@ -133,6 +141,8 @@ public class ClaudeSessionService extends Service {
 
     public void sendRaw(String seq) {
         if (!connected) return;
+        String display = seq.replace("\r", "").replace("\n", "").trim();
+        if (!display.isEmpty()) appendLog("[you] " + display + "\n");
         executor.execute(() -> {
             try {
                 if (outputStream != null) {
@@ -145,17 +155,36 @@ public class ClaudeSessionService extends Service {
 
     private void emit(String text) {
         outputBuffer.append(text);
-        // Keep buffer from growing unbounded
         if (outputBuffer.length() > 50000) {
             outputBuffer.delete(0, outputBuffer.length() - 50000);
         }
+        if (!text.isBlank()) appendLog(text);
         if (listener != null) listener.onOutput(text);
     }
 
+    private void appendLog(String text) {
+        if (chatLogPath == null) return;
+        executor.execute(() -> {
+            try (FileWriter fw = new FileWriter(chatLogPath, true)) {
+                fw.write(text);
+            } catch (Exception ignored) {}
+        });
+    }
+
     private String stripAnsi(String s) {
-        return s.replaceAll("\\[[;\\d]*[A-Za-z]", "")
-                .replaceAll("\\][^]*", "")
-                .replace("\r", "");
+        // CSI: ESC [ ... final-byte
+        s = s.replaceAll("\\x1B\\[[^@-~]*[@-~]", "");
+        // OSC: ESC ] ... BEL or ESC backslash
+        s = s.replaceAll("\\x1B\\][^\\x07\\x1B]*(?:\\x07|\\x1B\\\\)", "");
+        // Other two-char ESC sequences and lone ESC
+        s = s.replaceAll("\\x1B.", "").replaceAll("\\x1B", "");
+        // Normalize CR
+        s = s.replace("\r\n", "\n").replace("\r", "");
+        // Drop lines that are only spinner/decoration chars
+        s = s.replaceAll("(?m)^[\u2808-\u280F\u2810-\u281F\u2820-\u282F\u2830-\u283F✓✗·\\s]*$\n?", "");
+        // Collapse 3+ consecutive blank lines to one blank line
+        s = s.replaceAll("\n{3,}", "\n\n");
+        return s;
     }
 
     private Notification buildNotification(String text) {
