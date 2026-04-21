@@ -10,6 +10,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.inputmethod.EditorInfo;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ScrollView;
@@ -21,6 +22,7 @@ public class TerminalActivity extends AppCompatActivity {
     private TextView outputView;
     private EditText inputView;
     private ScrollView scrollView;
+    private Button connectToggleBtn;
     private Handler mainHandler;
 
     private ClaudeSessionService service;
@@ -34,7 +36,9 @@ public class TerminalActivity extends AppCompatActivity {
             service.setListener(text -> mainHandler.post(() -> {
                 outputView.append(text);
                 scrollView.post(() -> scrollView.fullScroll(ScrollView.FOCUS_DOWN));
+                updateToggleButton();
             }));
+            updateToggleButton();
             if (!service.connected) {
                 SharedPreferences prefs = getSharedPreferences("claude_prefs", MODE_PRIVATE);
                 service.connect(prefs.getString("api_key", ""));
@@ -45,6 +49,7 @@ public class TerminalActivity extends AppCompatActivity {
         public void onServiceDisconnected(ComponentName name) {
             bound = false;
             service = null;
+            updateToggleButton();
         }
     };
 
@@ -56,18 +61,30 @@ public class TerminalActivity extends AppCompatActivity {
         outputView = findViewById(R.id.terminal_output);
         inputView = findViewById(R.id.terminal_input);
         scrollView = findViewById(R.id.terminal_scroll);
+        connectToggleBtn = findViewById(R.id.btn_connect_toggle);
         ImageButton sendBtn = findViewById(R.id.send_btn);
         mainHandler = new Handler(Looper.getMainLooper());
 
         sendBtn.setOnClickListener(v -> sendInput());
 
-        findViewById(R.id.key_esc).setOnClickListener(v -> sendRaw(""));
+        findViewById(R.id.key_esc).setOnClickListener(v -> sendRaw(""));
         findViewById(R.id.key_tab).setOnClickListener(v -> sendRaw("\t"));
-        findViewById(R.id.key_up).setOnClickListener(v -> sendRaw("[A"));
-        findViewById(R.id.key_down).setOnClickListener(v -> sendRaw("[B"));
-        findViewById(R.id.key_left).setOnClickListener(v -> sendRaw("[D"));
-        findViewById(R.id.key_right).setOnClickListener(v -> sendRaw("[C"));
+        findViewById(R.id.key_up).setOnClickListener(v -> sendRaw("[A"));
+        findViewById(R.id.key_down).setOnClickListener(v -> sendRaw("[B"));
+        findViewById(R.id.key_left).setOnClickListener(v -> sendRaw("[D"));
+        findViewById(R.id.key_right).setOnClickListener(v -> sendRaw("[C"));
         findViewById(R.id.key_enter).setOnClickListener(v -> sendRaw("\n"));
+
+        connectToggleBtn.setOnClickListener(v -> {
+            if (!bound || service == null) return;
+            if (service.connected) {
+                service.disconnect();
+            } else {
+                outputView.setText("");
+                service.reconnect();
+            }
+            updateToggleButton();
+        });
 
         inputView.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEND ||
@@ -77,6 +94,15 @@ public class TerminalActivity extends AppCompatActivity {
                 return true;
             }
             return false;
+        });
+    }
+
+    private void updateToggleButton() {
+        if (connectToggleBtn == null) return;
+        mainHandler.post(() -> {
+            boolean isConnected = bound && service != null && service.connected;
+            connectToggleBtn.setText(isConnected ? "DISCONNECT" : "RECONNECT");
+            connectToggleBtn.setTextColor(isConnected ? 0xFFFF5252 : 0xFF4CAF50);
         });
     }
 

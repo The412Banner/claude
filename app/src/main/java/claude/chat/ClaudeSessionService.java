@@ -63,11 +63,29 @@ public class ClaudeSessionService extends Service {
     }
 
     private boolean connecting = false;
+    private String lastApiKey = "";
 
     public void connect(String apiKey) {
         if (connected || connecting) return;
+        lastApiKey = apiKey;
         connecting = true;
         executor.execute(() -> connectWithRetry(apiKey));
+    }
+
+    public void disconnect() {
+        connected = false;
+        connecting = false;
+        try { if (socket != null) socket.close(); } catch (Exception ignored) {}
+        socket = null;
+        outputStream = null;
+        emit("\n[disconnected]\n");
+        updateNotification("Claude session active");
+    }
+
+    public void reconnect() {
+        disconnect();
+        outputBuffer.setLength(0);
+        connect(lastApiKey);
     }
 
     private boolean isBridgeAlreadyRunning() {
