@@ -64,7 +64,7 @@ def main():
 
         master_fd, slave_fd = pty.openpty()
         proc = subprocess.Popen(
-            ["claude"],
+            ["/data/data/com.termux/files/usr/bin/claude"],
             stdin=slave_fd,
             stdout=slave_fd,
             stderr=slave_fd,
