@@ -25,12 +25,12 @@ public class TermuxBridge {
     public static String installBridgeScript(Context ctx, String apiKey) {
         String script = getBridgeScriptContent(apiKey);
         String writeCmd = "cat > " + BRIDGE_SCRIPT_PATH + " << 'BRIDGESCRIPT'\n" + script + "\nBRIDGESCRIPT\nchmod +x " + BRIDGE_SCRIPT_PATH;
-        return runInTermux(ctx, new String[]{"bash", "-c", writeCmd}, true);
+        return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/bash", "-c", writeCmd}, true);
     }
 
     // Returns null on success, or an error string on failure
     public static String startBridge(Context ctx, String apiKey) {
-        return runInTermux(ctx, new String[]{"python3", BRIDGE_SCRIPT_PATH}, true);
+        return runInTermux(ctx, new String[]{"/data/data/com.termux/files/usr/bin/python3", BRIDGE_SCRIPT_PATH}, true);
     }
 
     // Returns null on success, or an error message string if it fails
