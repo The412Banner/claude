@@ -1,27 +1,69 @@
 #!/usr/bin/env python3
 """
 Claude Bridge — runs inside Termux.
-Starts `claude` in a PTY and exposes it over a TCP socket on localhost:9876.
-The Claude Android app connects to this socket to drive the session.
+Starts `claude --output-format stream-json` in a PTY, parses the JSON stream,
+and forwards only the actual assistant text over TCP localhost:9876.
 """
 import os
 import pty
+import re
 import socket
 import subprocess
 import threading
 import sys
+import json
 import datetime
 
 PORT = 9876
 HOST = "127.0.0.1"
 LOG = "/data/data/com.termux/files/home/bridge.log"
+JSON_LOG = "/data/data/com.termux/files/home/bridge_json.log"
 
 current_proc = None
 current_proc_lock = threading.Lock()
 
+ANSI_RE = re.compile(r'\x1B(?:\[[^@-~]*[@-~]|\][^\x07\x1B]*(?:\x07|\x1B\\)|.)')
+
 def log(msg):
     with open(LOG, "a") as f:
         f.write(f"{datetime.datetime.now()} {msg}\n")
+
+def log_json(line):
+    with open(JSON_LOG, "a") as f:
+        f.write(line + "\n")
+
+def extract_text(line):
+    """
+    Parse one JSON line from --output-format stream-json.
+    Returns the text string to display, or None if nothing to show.
+    Raw line is always written to bridge_json.log for inspection.
+    """
+    line = ANSI_RE.sub('', line).strip()
+    if not line:
+        return None
+    log_json(line)
+    try:
+        obj = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+
+    t = obj.get("type", "")
+
+    # Streaming API format: content_block_delta carries text chunks
+    if t == "content_block_delta":
+        delta = obj.get("delta", {})
+        if delta.get("type") == "text_delta":
+            return delta.get("text", "")
+
+    # Non-streaming / result format: top-level "result" field
+    if t == "result":
+        return obj.get("result", "") + "\n"
+
+    # Some builds emit {"type":"text","text":"..."} directly
+    if t == "text":
+        return obj.get("text", "")
+
+    return None
 
 def handle_session(conn, api_key):
     global current_proc
@@ -33,7 +75,9 @@ def handle_session(conn, api_key):
     proc = subprocess.Popen(
         [
             "/data/data/com.termux/files/usr/bin/proot-distro", "login", "debian",
-            "--user", "claude-user", "--", "claude", "--dangerously-skip-permissions"
+            "--user", "claude-user", "--", "claude",
+            "--dangerously-skip-permissions",
+            "--output-format", "stream-json",
         ],
         stdin=slave_fd,
         stdout=slave_fd,
@@ -49,14 +93,31 @@ def handle_session(conn, api_key):
     log(f"claude spawned pid={proc.pid}")
 
     def forward_to_client():
+        buf = b""
         while True:
             try:
-                data = os.read(master_fd, 4096)
-                if not data:
+                chunk = os.read(master_fd, 4096)
+                if not chunk:
                     break
-                conn.sendall(data)
+                buf += chunk
+                # Process complete lines
+                while b"\n" in buf:
+                    line_bytes, buf = buf.split(b"\n", 1)
+                    line = line_bytes.decode("utf-8", errors="replace")
+                    text = extract_text(line)
+                    if text:
+                        conn.sendall(text.encode("utf-8"))
             except OSError:
                 break
+        # Flush remaining buffer
+        if buf:
+            line = buf.decode("utf-8", errors="replace")
+            text = extract_text(line)
+            if text:
+                try:
+                    conn.sendall(text.encode("utf-8"))
+                except OSError:
+                    pass
         conn.close()
 
     def forward_to_process():
@@ -103,7 +164,6 @@ def main():
         conn, addr = server.accept()
         log(f"client connected from {addr}")
 
-        # Kill any existing claude session before starting a new one
         with current_proc_lock:
             if current_proc is not None:
                 log(f"killing previous claude pid={current_proc.pid}")
@@ -111,7 +171,6 @@ def main():
 
         t = threading.Thread(target=handle_session, args=(conn, api_key), daemon=True)
         t.start()
-        # Immediately loop back to accept() — don't block here
 
 if __name__ == "__main__":
     main()

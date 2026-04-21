@@ -127,9 +127,8 @@ public class ClaudeSessionService extends Service {
             byte[] buf = new byte[4096];
             int n;
             while ((n = in.read(buf)) != -1) {
-                String raw = new String(buf, 0, n, StandardCharsets.UTF_8);
-                String clean = stripAnsi(raw);
-                if (!clean.isEmpty()) emit(clean);
+                String text = new String(buf, 0, n, StandardCharsets.UTF_8);
+                if (!text.isEmpty()) emit(text);
             }
         } catch (Exception e) {
             // ignore
@@ -169,28 +168,6 @@ public class ClaudeSessionService extends Service {
                 fw.write(text);
             } catch (Exception ignored) {}
         });
-    }
-
-    private String stripAnsi(String s) {
-        // CSI: ESC [ ... final-byte
-        s = s.replaceAll("\\x1B\\[[^@-~]*[@-~]", "");
-        // OSC: ESC ] ... BEL or ESC backslash
-        s = s.replaceAll("\\x1B\\][^\\x07\\x1B]*(?:\\x07|\\x1B\\\\)", "");
-        // Other two-char ESC sequences and lone ESC
-        s = s.replaceAll("\\x1B.", "").replaceAll("\\x1B", "");
-        // Normalize CR
-        s = s.replace("\r\n", "\n").replace("\r", "");
-        // Drop lines that are only box-drawing/separator chars
-        s = s.replaceAll("(?m)^[\\u2500-\\u257F\\-_=\\s]+$\n?", "");
-        // Drop Claude CLI status bar lines
-        s = s.replaceAll("(?m)^.*(?:bypass permissions|shift\\+tab to cycle|esctointerrupt|esc to interrupt|·/effort|·medium).*$\n?", "");
-        // Drop lines starting with thinking/spinner chars (braille, ✦ ✺ · ❯ › *)
-        s = s.replaceAll("(?m)^[\\u2800-\\u28FF✦✺✸✼✤✢✣·❯›⊕⊗*✓✗\\s]{0,3}[\\u2800-\\u28FF✦✺✸✼✤✢✣·❯›⊕⊗*].*$\n?", "");
-        // Drop lone prompt chars
-        s = s.replaceAll("(?m)^[›❯>\\s]+$\n?", "");
-        // Collapse 3+ consecutive blank lines
-        s = s.replaceAll("\n{3,}", "\n\n");
-        return s;
     }
 
     private Notification buildNotification(String text) {
